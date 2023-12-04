@@ -3,14 +3,16 @@ set -euo pipefail
 # Mandatory
 pod=""
 target=""
-image=""
 # Optional
+image="ubuntu:latest"
 namespace=""
 proxy_port="8001"
-command="/bin/bash"
+command="/bin/sh"
+verbose="--no-progress-meter -o /dev/null"  # make curl silent by default
 
 function help {
-    echo "kubectl-superdebug <pod> <-t target> [-n namespace] [-I image] [-P proxy-port] [-C command]
+     echo "kubectl-superdebug <pod> <-t|--target target> [-n|--namespace namespace] [-I|--image image]
+                  [-P|--proxy-port proxy-port] [-C|--command command]
 
 Attach an ephemeral debug container to a running container in a running pod.
 The ephemeral container shares the PID namespace and volume attachments with the target container.
@@ -42,7 +44,7 @@ while [[ $# -gt 0 ]]; do
         target="$2"
         shift 2
         ;;
-    -i | --image)
+    -I | --image)
         image="$2"
         shift 2
         ;;
@@ -58,6 +60,10 @@ while [[ $# -gt 0 ]]; do
         command="$2"
         shift 2
         ;;
+    -v | --verbose)
+        verbose="-v"
+        shift
+        ;;
     -h | --help | help)
         help
         exit 0
@@ -65,6 +71,7 @@ while [[ $# -gt 0 ]]; do
     *)
         if [ -z "$pod" ]; then
             pod="$1"
+            shift
         else
             echo "Unknown option provided ${1:-}" >&2
             exit 1
@@ -83,6 +90,7 @@ if [ -z "$target" ]; then
 fi
 if [ -z "$namespace" ]; then
     namespace="$(kubectl config get-contexts "$(kubectl config current-context)" | tail -n1 | awk '{ print $5 }')"
+    [ -z "$namespace" ] && namespace="default"
     echo "Using default namespace ${namespace}" 1>&2
 fi
 
@@ -109,7 +117,7 @@ check_existing() {
     echo "You can connect to them using the following commands:" 1>&2
     local container
     for container in $running; do
-        echo -e "\tkubectl -n services attach \"${pod}\" -i -t -c \"${container}\"" 1>&2
+        echo -e "\tkubectl -n \"$namespace\" attach \"${pod}\" -i -t -c \"${container}\"" 1>&2
     done
     echo
     echo -n "Do you want to continue creating a new ephemeral container? [y/N]" 1>&2
@@ -122,7 +130,7 @@ check_existing() {
 
 check_existing
 patches_string=","
-mounts="$(kubectl get pod ${pod} -n ${namespace} -ojson | jq '[.spec.containers[] | select(.name == "'"${target}"'").volumeMounts[] | select(has("subPath") | not)]' -r)"
+mounts="$(kubectl get pod ${pod} -n "${namespace}" -ojson | jq '[.spec.containers[] | select(.name == "'"${target}"'").volumeMounts[] | select(has("subPath") | not)]' -r)"
 if [[ "$mounts" != "null" ]]; then
     patches_string="\"volumeMounts\": $mounts,"
 fi
@@ -164,10 +172,11 @@ curl http://localhost:${proxy_port}/api/v1/namespaces/${namespace}/pods/${pod}/e
     -X PATCH \
     -H "Content-Type: application/strategic-merge-patch+json" \
     --data "${patch}" \
-    -v \
+    ${verbose} \
     -f ||
     {
-        echo "Pod patching unsuccesful" 1>&2
+        echo "Pod patching unsuccessful" 1>&2
+        echo "  when sending data: ${patch}" 1>&2
         exit 1
     }
 
