@@ -22,7 +22,7 @@ Options:
     --pod/-p: The pod to attach the debug container to
     --target/-t: The container to attach the debug container to
     --namespace/-n: The namespace of the pod (default: current context namespace)
-    --image/-i: The image to use for the debug container (default: platform debug image or ubuntu:latest)
+    --image/-I: The image to use for the debug container (default: platform debug image or ubuntu:latest)
     --command/-C: The command to run in the debug container (default: /bin/bash)
     --proxy-port/-P: The port to use for kubectl proxy, used by this script in the backendd (default: 8001)
 
