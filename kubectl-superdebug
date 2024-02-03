@@ -25,7 +25,7 @@ Options:
     --proxy-port/-P: The port to use for kubectl proxy, used by this script in the backendd (default: 8001)
 
 Images:
-You can specify a custom image for the debug container to use with the -n option.
+You can specify a custom image for the debug container to use with the -i option.
 If the image is located in a private repository, the image pull secret required to pull the image must be present in the pod.
 If no image is specified, the script will attempt to use the platform debug image.
 If the secret required to pull the platform debug image is not available, the script will use ubuntu:latest.
