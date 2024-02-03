@@ -10,22 +10,22 @@ proxy_port="8001"
 command="/bin/bash"
 
 function help {
-    echo "kubectl-superdebug <pod> <-t target> [-n namespace] [-I image] [-P proxy-port] [-C command]
+    echo "kubectl-superdebug <pod> <-t target> [-n namespace] [-i image] [-P proxy-port] [-C command]
 
 Attach an ephemeral debug container to a running container in a running pod.
 The ephemeral container shares the PID namespace and volume attachments with the target container.
 The ability to copy the volume attachments separates the functionality from that of kubectl debug.
 
 Options:
-    pod: The pod to attach the debug container to
-    target: The container to attach the debug container to
-    namespace: The namespace of the pod (default: current context namespace)
-    image: The image to use for the debug container (default: platform debug image or ubuntu:latest)
-    command: The command to run in the debug container (default: /bin/bash)
-    proxy-port: The port to use for kubectl proxy, used by this script in the backendd (default: 8001)
+    --pod/-p: The pod to attach the debug container to
+    --target/-t: The container to attach the debug container to
+    --namespace/-n: The namespace of the pod (default: current context namespace)
+    --image/-i: The image to use for the debug container (default: platform debug image or ubuntu:latest)
+    --command/-C: The command to run in the debug container (default: /bin/bash)
+    --proxy-port/-P: The port to use for kubectl proxy, used by this script in the backendd (default: 8001)
 
 Images:
-You can specify a custom image for the debug container to use with the -I option.
+You can specify a custom image for the debug container to use with the -n option.
 If the image is located in a private repository, the image pull secret required to pull the image must be present in the pod.
 If no image is specified, the script will attempt to use the platform debug image.
 If the secret required to pull the platform debug image is not available, the script will use ubuntu:latest.
