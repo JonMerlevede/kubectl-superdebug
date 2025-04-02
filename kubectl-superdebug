@@ -11,27 +11,36 @@ command=()
 verbose=( -s -o /dev/null )  # make curl silent by default
 
 function help {
-     echo "kubectl-superdebug <pod> <-t|--target target> [--context context] [-n|--namespace namespace]
-                  [-I|--image image] [-P|--proxy-port proxy-port] [command...]
+    cat <<-EOF
+kubectl-superdebug <-t|--target target> [-p|--pod} <pod>
+    [--context context] [-n|--namespace namespace] [-I|--image image] 
+    [-P|--proxy-port proxy-port] [command...]
 
 Attach an ephemeral debug container to a running container in a running pod.
-The ephemeral container shares the PID namespace and volume attachments with the target container.
-The ability to copy the volume attachments separates the functionality from that of kubectl debug.
+The ephemeral container shares the PID namespace and volume attachments with 
+the target container. The ability to copy the volume attachments separates the 
+functionality from that of kubectl debug.
 
 Options:
     --pod/-p: The pod to attach the debug container to
     --target/-t: The container to attach the debug container to
     --context: The Context name (default: current context name)
     --namespace/-n: The namespace of the pod (default: namespace of context)
-    --image/-I: The image to use for the debug container (default: platform debug image or ubuntu:latest)
-    --proxy-port/-P: The port to use for kubectl proxy, used by this script in the backendd (default: 8001)
+    --image/-I: The image to use for the debug container (default: platform 
+        debug image or ubuntu:latest)
+    --proxy-port/-P: The port to use for kubectl proxy, used by this script in 
+        the backendd (default: 8001)
 
 Images:
-You can specify a custom image for the debug container to use with the -I option.
-If the image is located in a private repository, the image pull secret required to pull the image must be present in the pod.
-If no image is specified, the script will attempt to use the platform debug image.
-If the secret required to pull the platform debug image is not available, the script will use ubuntu:latest.
-"
+- You can specify a custom image for the debug container to use with the -I 
+  option.
+- If the image is located in a private repository, the image pull secret 
+  required to pull the image must be present in the pod.
+- If no image is specified, the script will attempt to use the platform debug 
+  image.
+- If the secret required to pull the platform debug image is not available, the
+  script will use ubuntu:latest.
+EOF
 }
 
 while [[ ${#} -gt 0 ]]; do
@@ -202,10 +211,12 @@ curl "http://localhost:${proxy_port}/api/v1/namespaces/${namespace}/pods/${pod}/
     }
 
 cat <<-EOF
-Created ephemeral debug container. Give it some time to start, then connect to it using the following command:
+Created ephemeral debug container. Give it some time to start, then connect to 
+it using the following command:
 
-kubectl --context "${context}" -n "${namespace}" attach "${pod}" -i -t -c "${container_name}"
+kubectl --context "${context}" -n "${namespace}" attach "${pod}" -i -t \
+    -c "${container_name}"
 
-You may disconnect from the debug container by pressing Ctrl-P followed by Ctrl-D.
-If you exit the shell, the debug container will be terminated.
+You may disconnect from the debug container by pressing Ctrl-P followed by 
+Ctrl-D. If you exit the shell, the debug container will be terminated.
 EOF
