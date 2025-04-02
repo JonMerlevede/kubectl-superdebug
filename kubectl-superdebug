@@ -77,6 +77,14 @@ while [[ ${#} -gt 0 ]]; do
         help
         exit 0
         ;;
+    --)
+        # Everything after is the command to execute.
+        shift 1
+        while [[ ${#} -gt 0 ]]; do
+            command+=( "${1}" )
+            shift 1
+        done
+        ;;
     *)
         if [ -z "${pod:-}" ]; then
             pod="${1}"
@@ -214,7 +222,8 @@ cat <<-EOF
 Created ephemeral debug container. Give it some time to start, then connect to 
 it using the following command:
 
-kubectl --context "${context}" -n "${namespace}" attach "${pod}" -i -t \
+kubectl --context "${context}" -n "${namespace}" \\
+    attach "${pod}" -i -t \\
     -c "${container_name}"
 
 You may disconnect from the debug container by pressing Ctrl-P followed by 
