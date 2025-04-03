@@ -228,4 +228,10 @@ kubectl --context "${context}" -n "${namespace}" \\
 
 You may disconnect from the debug container by pressing Ctrl-P followed by 
 Ctrl-D. If you exit the shell, the debug container will be terminated.
+
+If you want to view the logs of the ephemeral container, run the following:
+
+kubectl logs -n "${namespace}" "${pod}" \\
+    -c "${container_name}"
+
 EOF
