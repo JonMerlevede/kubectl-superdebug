@@ -7,99 +7,115 @@ target=""
 image="ubuntu:latest"
 namespace=""
 proxy_port="8001"
-command="/bin/sh"
-verbose="--no-progress-meter -o /dev/null"  # make curl silent by default
+command=()
+verbose=( -s -o /dev/null )  # make curl silent by default
 
 function help {
-     echo "kubectl-superdebug <pod> <-t|--target target> [--context context] [-n|--namespace namespace]
-                  [-I|--image image] [-P|--proxy-port proxy-port] [-C|--command command]
+    cat <<-EOF
+kubectl-superdebug <-t|--target target> [-p|--pod} <pod>
+    [--context context] [-n|--namespace namespace] [-I|--image image] 
+    [-P|--proxy-port proxy-port] [command...]
 
 Attach an ephemeral debug container to a running container in a running pod.
-The ephemeral container shares the PID namespace and volume attachments with the target container.
-The ability to copy the volume attachments separates the functionality from that of kubectl debug.
+The ephemeral container shares the PID namespace and volume attachments with 
+the target container. The ability to copy the volume attachments separates the 
+functionality from that of kubectl debug.
 
 Options:
     --pod/-p: The pod to attach the debug container to
     --target/-t: The container to attach the debug container to
     --context: The Context name (default: current context name)
     --namespace/-n: The namespace of the pod (default: namespace of context)
-    --image/-I: The image to use for the debug container (default: platform debug image or ubuntu:latest)
-    --command/-C: The command to run in the debug container (default: /bin/bash)
-    --proxy-port/-P: The port to use for kubectl proxy, used by this script in the backendd (default: 8001)
+    --image/-I: The image to use for the debug container (default: platform 
+        debug image or ubuntu:latest)
+    --proxy-port/-P: The port to use for kubectl proxy, used by this script in 
+        the backendd (default: 8001)
 
 Images:
-You can specify a custom image for the debug container to use with the -I option.
-If the image is located in a private repository, the image pull secret required to pull the image must be present in the pod.
-If no image is specified, the script will attempt to use the platform debug image.
-If the secret required to pull the platform debug image is not available, the script will use ubuntu:latest.
-"
+- You can specify a custom image for the debug container to use with the -I 
+  option.
+- If the image is located in a private repository, the image pull secret 
+  required to pull the image must be present in the pod.
+- If no image is specified, the script will attempt to use the platform debug 
+  image.
+- If the secret required to pull the platform debug image is not available, the
+  script will use ubuntu:latest.
+EOF
 }
 
-while [[ $# -gt 0 ]]; do
-    case "$1" in
+while [[ ${#} -gt 0 ]]; do
+    case "${1}" in
     -p | --pod)
-        pod="$2"
+        pod="${2}"
         shift 2
         ;;
     --context)
-        context="$2"
+        context="${2}"
         shift 2
         ;;
     -t | --target)
-        target="$2"
+        target="${2}"
         shift 2
         ;;
     -I | --image)
-        image="$2"
+        image="${2}"
         shift 2
         ;;
     -n | --namespace)
-        namespace="$2"
+        namespace="${2}"
         shift 2
         ;;
     -P | --proxy-port)
-        proxy_port="$2"
-        shift 2
-        ;;
-    -C | --command)
-        command="$2"
+        proxy_port="${2}"
         shift 2
         ;;
     -v | --verbose)
-        verbose="-v"
+        verbose=( -v )
         shift
         ;;
     -h | --help | help)
         help
         exit 0
         ;;
+    --)
+        # Everything after is the command to execute.
+        shift 1
+        while [[ ${#} -gt 0 ]]; do
+            command+=( "${1}" )
+            shift 1
+        done
+        ;;
     *)
-        if [ -z "$pod" ]; then
-            pod="$1"
-            shift
+        if [ -z "${pod:-}" ]; then
+            pod="${1}"
+            shift 1
         else
-            echo "Unknown option provided ${1:-}" >&2
-            exit 1
+            command+=( "${1}" )
+            shift 1
         fi
         ;;
     esac
 done
 
-if [ -z "$pod" ]; then
+if [ -z "${pod:-}" ]; then
     echo "Specify a pod to target (-p)" 1>&2
     exit 1
 fi
-if [ -z "$target" ]; then
+if [ -z "${target:-}" ]; then
     echo "Specify a container to target (-t)" 1>&2
     exit 1
 fi
-if [ -z "$context" ]; then
+if [ -z "${context:-}" ]; then
     context="$(kubectl config current-context)"
 fi
-if [ -z "$namespace" ]; then
-    namespace="$(kubectl config get-contexts "$context" | tail -n1 | awk '{ print $5 }')"
-    [ -z "$namespace" ] && namespace="default"
+if [ -z "${namespace:-}" ]; then
+    namespace="$(kubectl config get-contexts "${context}" | tail -n1 | awk '{ print $5 }')"
+    [ -z "${namespace:-}" ] && namespace="default"
     echo "Using default namespace ${namespace}" 1>&2
+fi
+
+if [[ "${#command[@]}" -eq 0 ]]; then
+    command=( /bin/sh )
 fi
 
 kill_kubectl_proxy() {
@@ -109,28 +125,28 @@ kill_kubectl_proxy() {
 }
 
 echo "Retrieving pod spec" 1>&2
-pod_spec=$(kubectl --context "$context" get pod -n "$namespace" "$pod" -ojson)
+pod_spec=$(kubectl --context "${context}" get pod -n "${namespace}" "${pod}" -ojson)
 
 check_existing() {
     echo "Checking for existing ephemeral containers" 1>&2
     local running
-    running=$(jq '.status.ephemeralContainerStatuses[] | select(.state | has("running")).name' -r 2>/dev/null <<<"$pod_spec") || :
-    if [ -z "$running" ]; then
+    running=$(jq '.status.ephemeralContainerStatuses[] | select(.state | has("running")).name' -r 2>/dev/null <<<"${pod_spec}") || :
+    if [ -z "${running:-}" ]; then
         return
     fi
-    if [[ "$running" == "null" ]]; then
+    if [[ "${running}" == "null" ]]; then
         return
     fi
     echo "Ephemeral containers are already running on this pod" 1>&2
     echo "You can connect to them using the following commands:" 1>&2
     local container
-    for container in $running; do
-        echo -e "\tkubectl --context "$context" -n \"$namespace\" attach \"${pod}\" -i -t -c \"${container}\"" 1>&2
+    for container in ${running}; do
+        echo -e "\tkubectl --context \"${context}\" -n \"$namespace\" attach \"${pod}\" -i -t -c \"${container}\"" 1>&2
     done
     echo
     echo -n "Do you want to continue creating a new ephemeral container? [y/N]" 1>&2
     read -r answer
-    if [[ "$answer" != "y" ]]; then
+    if [[ "${answer}" != "y" ]]; then
         echo "Aborting" 1>&2
         exit 1
     fi
@@ -138,9 +154,12 @@ check_existing() {
 
 check_existing
 patches_string=","
-mounts="$(kubectl --context "$context" get pod ${pod} -n "${namespace}" -ojson | jq '[.spec.containers[] | select(.name == "'"${target}"'").volumeMounts[] | select(has("subPath") | not)]' -r)"
-if [[ "$mounts" != "null" ]]; then
-    patches_string="\"volumeMounts\": $mounts,"
+mounts="$(
+    kubectl --context "${context}" get pod "${pod}" -n "${namespace}" -ojson | \
+        jq '[.spec.containers[] | select(.name == "'"${target}"'").volumeMounts[] | select(has("subPath") | not)]' -r
+)"
+if [[ "${mounts}" != "null" ]]; then
+    patches_string="\"volumeMounts\": ${mounts},"
 fi
 
 #shellcheck disable=SC2018
@@ -149,14 +168,25 @@ random_suffix="$({ LC_ALL=C tr -dc 'a-z' </dev/urandom || :; } | head -c6)"
 container_name="debug-${random_suffix}"
 
 echo "Starting kube proxy" 1>&2
-kubectl --context "$context" proxy --port "${proxy_port}" 1>&2 &
+kubectl --context "${context}" proxy --port "${proxy_port}" 1>&2 &
 trap 'kill_kubectl_proxy' SIGINT SIGTERM EXIT
 
+# Wait for the proxy 
 echo "Waiting for proxy to come up..." 1>&2
-sleep 2
+# NOTE: The expansion is for the args at the end.
+# shellcheck disable=SC2016
+timeout 20 \
+    bash -c 'until printf "" 2>/dev/null >/dev/tcp/$0/$1; do sleep 0.2; done' \
+    localhost \
+    "${proxy_port}"
 
-patch=$(
-    cat <<EOF
+command_json="$( 
+    jq --compact-output --null-input '$ARGS.positional' --args -- \
+        "${command[@]}"
+)"
+
+# Run the JSON through jq to format it. Helps when debugging.
+patch="$(jq . <<-EOF
 {
     "spec":
     {
@@ -164,7 +194,7 @@ patch=$(
             ${patches_string}
             "name": "${container_name}",
             "image": "${image}",
-            "command": ["${command}"],
+            "command": ${command_json},
             "stdin": true,
             "tty": true,
             "targetContainerName": "${target}"
@@ -172,15 +202,15 @@ patch=$(
     }
 }
 EOF
-)
+)"
 
 # alternatively, construct a JSON patch and apply a patch Content-Type: application/json-patch+json
 echo "Patching pod ${pod}, creating ephemeral container ${container_name}" 1>&2
-curl http://localhost:${proxy_port}/api/v1/namespaces/${namespace}/pods/${pod}/ephemeralcontainers \
+curl "http://localhost:${proxy_port}/api/v1/namespaces/${namespace}/pods/${pod}/ephemeralcontainers" \
     -X PATCH \
     -H "Content-Type: application/strategic-merge-patch+json" \
     --data "${patch}" \
-    ${verbose} \
+    "${verbose[@]}" \
     -f ||
     {
         echo "Pod patching unsuccessful" 1>&2
@@ -188,9 +218,20 @@ curl http://localhost:${proxy_port}/api/v1/namespaces/${namespace}/pods/${pod}/e
         exit 1
     }
 
-echo Created ephemeral debug container. Give it some time to start, then connect to it using the following command:
-echo
-echo -e "\tkubectl --context "$context" -n ${namespace} attach ${pod} -i -t -c \"${container_name}\""
-echo
-echo You may disconnect from the debug container by pressing Ctrl-P followed by Ctrl-D.
-echo If you exit the shell, the debug container will be terminated.
+cat <<-EOF
+Created ephemeral debug container. Give it some time to start, then connect to 
+it using the following command:
+
+kubectl --context "${context}" -n "${namespace}" \\
+    attach "${pod}" -i -t \\
+    -c "${container_name}"
+
+You may disconnect from the debug container by pressing Ctrl-P followed by 
+Ctrl-D. If you exit the shell, the debug container will be terminated.
+
+If you want to view the logs of the ephemeral container, run the following:
+
+kubectl logs -n "${namespace}" "${pod}" \\
+    -c "${container_name}"
+
+EOF
